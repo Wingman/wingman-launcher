@@ -1,0 +1,30 @@
+language: java
+
+before_install:
+ - chmod +x gradlew
+ 
+script:
+ - ./gradlew clean check test fatCapsule
+
+deploy:
+  skip_cleanup: true
+  provider: releases
+  api_key:
+    secure: "TkUUjTbmzXZr9E0V67GNU70hnzBCKzqp6O4+VQFoQqWfZOuGSs6VJDFrmbh5PfhpCGheKQNvlyBx0xXiXz17tA/cI2X3wAMO0h+0YDQp2unFVsqOHB93OMDfzBAWQZA182TG3WM63iQBLeWIoJVD0ZAvE3j0vQZEqW4wUVV8k/PkH6sxtNrVClsyIj/ZgeQg1BBBld6bwHelasPf46enPMR5yNvfSiq1IAt2QcpfXzbk+p6rU7MV4mW3JNHa2rr3zOpBbWHcLrQ11fAW3FoM/ja19xyAmMwXh2uqLCl0lXdDjBjh68jdK2rMpaddAh5HuduzeKb4ka59BHd62038/on3sf4HwEcrKB0AOArQT27voMeGcQ06S4Rvw6+D2kXWun8o649BGw+p/WCbsDwZ9WTdNGgOMWUTaykdBZuYmhFLEB5I4+OqrMZzizKitNThCovnupI4Cqh/EYYnDY9BWJy888S4W7Ky2atc2grKzZlaLC6J0i0spAl9hf6uf+cQGNUP0519SirfcEk1fSLL0544bL0WvIWckpZvyDQvMqbjLGO1DrTCUdupDBtPchTENUVMluXb3CG/m3ncAUWrJO0/dTGjCC3VeMxGrUOIBiWbTf5hsGCShiABjp1nkokB9Nj8AZi7hvWcFy56BMuX5HT8X6e02r0oOZv54OZLZ4A="
+  file:
+    - "build/libs/wingman-launcher-capsule.jar"
+  on:
+    tags: true
+
+after_deploy:
+ - git config --global user.name "WingmanUpdater"
+ - git config --global user.email "wingmanosrs@gmail.com"
+ - git clone https://github.com/Wingman/wingman.github.io.git
+ - cd wingman.github.io
+ - git remote rm origin
+ - git remote add origin https://wingmanupdater:$GH_TOKEN@github.com/Wingman/wingman.github.io.git
+ - mkdir download
+ - cp -R ../build/libs/wingman-launcher-capsule.jar "download/Wingman Launcher.jar"
+ - git add download/*
+ - git commit -m "Deploy launcher"
+ - git push -fq origin master
