@@ -1,11 +1,8 @@
 package com.wingman.launcher;
 
-import com.google.common.base.Throwables;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
-import com.squareup.okhttp.Callback;
-import com.squareup.okhttp.Request;
+import com.google.gson.JsonObject;
 import com.squareup.okhttp.Response;
 import com.wingman.launcher.net.HttpClient;
 import com.wingman.launcher.settings.Settings;
@@ -27,6 +24,7 @@ import java.nio.file.Paths;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
+import java.util.zip.ZipException;
 
 public class Main extends LauncherFrame {
 
@@ -53,7 +51,12 @@ public class Main extends LauncherFrame {
         });
 
         if (Settings.SETTINGS_FILE.exists()) {
-            checkUpdate();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    checkUpdate();
+                }
+            }).start();
         } else {
             settingsScreen.setVisible(true);
         }
@@ -68,54 +71,41 @@ public class Main extends LauncherFrame {
         setButtonText("Checking for updates");
 
         try {
-            HttpClient.downloadUrlAsync("https://api.github.com/repos/Wingman/wingman/releases/latest", new Callback() {
-                @Override
-                public void onFailure(Request request, IOException e) {
-                    Throwables.propagate(e);
-                    retryCheckUpdate(failedOnce);
+            JsonObject latestRelease = Util.getLatestRelease("Wingman", "wingman");
+
+            String tag = latestRelease
+                    .getAsJsonPrimitive("tag_name")
+                    .getAsString();
+
+            if (currentJar.exists()) {
+                boolean upToDate;
+                try {
+                    upToDate = isClientUpToDate(tag);
+                } catch (ZipException e) {
+                    upToDate = false;
                 }
 
-                @Override
-                public void onResponse(Response response) throws IOException {
-                    if (response.code() == 200) {
-                        String responseString = response.body().string();
-                        JsonElement rootElement = new JsonParser().parse(responseString);
-                        String tag = rootElement
-                                .getAsJsonObject()
-                                .getAsJsonPrimitive("tag_name")
-                                .getAsString();
-
-                        if (!currentJar.exists()) {
-                            if (!update(tag)) {
-                                setButtonText("Failed to download updates");
-                                return;
-                            }
-                        } else {
-                            if (!isClientUpToDate(tag)) {
-                                if (!update(tag)) {
-                                    setButtonText("Failed to download updates");
-                                    return;
-                                }
-                            }
-                        }
-
-                        if (settings.getBoolean(Settings.DOWNLOAD_DEFAULT_PLUGINS)) {
-                            checkPluginsUpToDate();
-                        }
-                        setReadyForLaunch();
-                    } else {
-                        if (response.code() == 403) {
-                            if (currentJar.exists()) {
-                                setReadyForLaunch();
-                            }
-                        } else {
-                            retryCheckUpdate(failedOnce);
-                        }
+                if (!upToDate) {
+                    if (!updateClient(tag)) {
+                        setButtonText("Failed to download updates");
+                        return;
                     }
                 }
-            });
+            } else {
+                if (!updateClient(tag)) {
+                    setButtonText("Failed to download updates");
+                    return;
+                }
+            }
+
+            if (settings.getBoolean(Settings.DOWNLOAD_DEFAULT_PLUGINS)) {
+                checkPluginsUpToDate("defaultplugins");
+                checkPluginsUpToDate("devutils");
+            }
+
+            setReadyForLaunch();
         } catch (IOException e) {
-            Throwables.propagate(e);
+            e.printStackTrace();
             retryCheckUpdate(failedOnce);
         }
     }
@@ -152,8 +142,8 @@ public class Main extends LauncherFrame {
         return true;
     }
 
-    private boolean update(String tag) {
-        setButtonText("Downloading updates");
+    private boolean updateClient(String tag) {
+        setButtonText("Downloading Wingman " + tag);
 
         try {
             Response fileResponse
@@ -163,28 +153,24 @@ public class Main extends LauncherFrame {
             sink.close();
             return true;
         } catch (IOException e) {
-            Throwables.propagate(e);
+            e.printStackTrace();
         }
         return false;
     }
 
-    private void checkPluginsUpToDate() throws IOException {
-        Response response = HttpClient.downloadUrlSync("https://api.github.com/repos/Wingman/wingman-defaultplugins/releases/latest");
-        String responseString = response.body().string();
-        JsonElement rootElement = new JsonParser().parse(responseString);
+    private void checkPluginsUpToDate(String repoSuffix) throws IOException {
+        JsonObject latestRelease = Util.getLatestRelease("Wingman", "wingman-" + repoSuffix);
 
-        String tag = rootElement
-                .getAsJsonObject()
+        String tag = latestRelease
                 .getAsJsonPrimitive("tag_name")
                 .getAsString();
 
-        Path versionFile = pluginPath.resolve("defaultplugins.version");
+        Path versionFile = pluginPath.resolve(repoSuffix + ".version");
 
         boolean isUpToDate = versionFile.toFile().exists()
                 && Files.readAllLines(versionFile, Charset.defaultCharset()).get(0).equals(tag);
 
-        JsonArray assets = rootElement
-                .getAsJsonObject()
+        JsonArray assets = latestRelease
                 .getAsJsonArray("assets");
 
         for (JsonElement asset : assets) {
@@ -196,7 +182,7 @@ public class Main extends LauncherFrame {
             if (name.endsWith("-default.jar")) {
                 if (!isUpToDate || !pluginPath.resolve(name).toFile().exists()) {
                     setButtonText("Downloading " + name);
-                    HttpClient.downloadFileSync("https://github.com/Wingman/wingman-defaultplugins/releases/download/" + tag + "/" + name,
+                    HttpClient.downloadFileSync("https://github.com/Wingman/wingman-" + repoSuffix + "/releases/download/" + tag + "/" + name,
                             pluginPath.resolve(name));
                 }
             }
@@ -215,7 +201,7 @@ public class Main extends LauncherFrame {
             Desktop.getDesktop().open(currentJar);
             return true;
         } catch (IOException e) {
-            Throwables.propagate(e);
+            e.printStackTrace();
         }
         return false;
     }

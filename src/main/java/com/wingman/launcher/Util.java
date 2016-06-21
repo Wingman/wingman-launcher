@@ -1,10 +1,31 @@
 package com.wingman.launcher;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.squareup.okhttp.Response;
+import com.wingman.launcher.net.HttpClient;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
 public final class Util {
+
+    public static JsonObject getLatestRelease(String owner, String repo) throws IOException {
+        Response response = HttpClient
+                .downloadUrlSync("https://api.github.com/repos/" + owner + "/" + repo + "/releases/latest");
+
+        String responseString = response
+                .body()
+                .string();
+
+        JsonElement rootElement = new JsonParser()
+                .parse(responseString);
+
+        return rootElement
+                .getAsJsonObject();
+    }
 
     /**
      * Attempts to retrieve a {@link InputStream} representation of a file as seen from the launcher class loader resource path.

@@ -1,6 +1,5 @@
 package com.wingman.launcher.net;
 
-import com.squareup.okhttp.Callback;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
@@ -48,28 +47,11 @@ public class HttpClient {
     }
 
     /**
-     * Constructs an asynchronous request to the URL specified, and places it on the OkHttp worker thread. <br>
-     * The instance of {@link Callback} specified in the arguments is called upon completion of the request.
-     *
-     * @param url the URL of your request
-     * @param callback the {@link Callback} called after request completion
-     * @throws IOException
-     */
-    public static void downloadUrlAsync(String url, Callback callback) throws IOException {
-        Request request = getRealisticRequestBuilder()
-                .url(url)
-                .build();
-
-        httpClient.newCall(request)
-                .enqueue(callback);
-    }
-
-    /**
      * Constructs a {@link com.squareup.okhttp.Request.Builder} with request headers attempting to mimic a real browser. <br>
      *
      * @return a {@link com.squareup.okhttp.Request.Builder} with somewhat realistic headers
      */
-    public static Request.Builder getRealisticRequestBuilder() {
+    private static Request.Builder getRealisticRequestBuilder() {
         if (cachedRequestBuilder == null) {
             cachedRequestBuilder = new Request.Builder()
                     .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:44.0) Gecko/20100101 Firefox/44.0")
